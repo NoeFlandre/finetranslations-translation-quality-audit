@@ -1,4 +1,4 @@
-# finetranslations-edu-quality-audit
+# finetranslations-translation-quality-audit
 
 Auditing the translation quality of FineTranslations documents. The scope is still being defined.
 
@@ -10,5 +10,5 @@ Auditing the translation quality of FineTranslations documents. The scope is sti
 - `uv run ty check` type-checks the code.
 - `uv run mkdocs build --strict` builds these pages.
 - `uv run mutmut run` runs mutation testing; survivors must be killed or justified.
-- `uv run pytest -o addopts="" --cov=edu_quality_audit --cov=scripts --cov-branch --cov-report=json`
+- `uv run pytest -o addopts="" --cov=translation_quality_audit --cov=scripts --cov-branch --cov-report=json`
   followed by `uv run python -m scripts.crap coverage.json --limit 6` checks the CRAP scores.

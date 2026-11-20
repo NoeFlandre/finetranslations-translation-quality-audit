@@ -1,4 +1,4 @@
-site_name: finetranslations-edu-quality-audit
+site_name: finetranslations-translation-quality-audit
 site_description: Auditing the translation quality of FineTranslations documents.
 theme:
   name: material

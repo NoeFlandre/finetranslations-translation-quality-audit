@@ -11,7 +11,7 @@ from pathlib import Path
 from radon.complexity import cc_visit
 from radon.visitors import Class
 
-DEFAULT_PACKAGES = ("edu_quality_audit", "scripts")
+DEFAULT_PACKAGES = ("translation_quality_audit", "scripts")
 
 
 def crap_scores(coverage: dict, packages: tuple[str, ...]) -> list[tuple[float, str]]:

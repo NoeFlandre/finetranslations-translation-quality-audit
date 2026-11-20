@@ -1,5 +1,5 @@
 [project]
-name = "finetranslations-edu-quality-audit"
+name = "finetranslations-translation-quality-audit"
 version = "0.1.0"
 description = "Auditing the translation quality of FineTranslations documents."
 readme = "README.md"
@@ -27,7 +27,7 @@ testpaths = ["tests"]
 addopts = "-q"
 
 [tool.coverage.run]
-source = ["edu_quality_audit", "scripts"]
+source = ["translation_quality_audit", "scripts"]
 branch = true
 
 [tool.coverage.report]
@@ -36,7 +36,7 @@ fail_under = 100
 
 [tool.ruff]
 line-length = 100
-src = ["edu_quality_audit", "tests", "scripts"]
+src = ["translation_quality_audit", "tests", "scripts"]
 
 [tool.ruff.lint]
 select = [
@@ -55,4 +55,4 @@ convention = "google"
 "tests/**" = ["D"]
 
 [tool.mutmut]
-source_paths = ["edu_quality_audit/", "scripts/"]
+source_paths = ["translation_quality_audit/", "scripts/"]

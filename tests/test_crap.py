@@ -7,7 +7,7 @@ from scripts.crap import crap_scores, main
 SOURCE = (
     "def simple():\n    return 1\n\n\ndef branchy(x):\n    if x:\n        return 1\n    return 2\n"
 )
-PACKAGE = ("edu_quality_audit",)
+PACKAGE = ("translation_quality_audit",)
 
 
 @pytest.fixture
@@ -16,7 +16,7 @@ def package_file(tmp_path):
 
 
 def write_module(tmp_path, name, source):
-    path = tmp_path / "edu_quality_audit" / name
+    path = tmp_path / "translation_quality_audit" / name
     path.parent.mkdir(exist_ok=True)
     path.write_text(source)
     return path
@@ -109,7 +109,7 @@ def test_main_fails_when_a_function_reaches_the_limit(package_file, tmp_path, ca
         tmp_path, {package_file: {"executed_lines": [1, 2], "missing_lines": [5, 6, 7, 8]}}
     )
 
-    status = main([str(report_path), "--packages", "edu_quality_audit", "--limit", "6"])
+    status = main([str(report_path), "--packages", "translation_quality_audit", "--limit", "6"])
 
     assert status == 1
     assert "at or over 6.0: 1" in capsys.readouterr().out
@@ -121,7 +121,7 @@ def test_main_passes_when_every_function_stays_below_the_limit(package_file, tmp
         {package_file: {"executed_lines": [1, 2, 5, 6, 7, 8], "missing_lines": []}},
     )
 
-    status = main([str(report_path), "--packages", "edu_quality_audit", "--limit", "6"])
+    status = main([str(report_path), "--packages", "translation_quality_audit", "--limit", "6"])
 
     assert status == 0
 
@@ -131,7 +131,7 @@ def test_main_uses_six_as_the_default_limit(package_file, tmp_path):
         tmp_path, {package_file: {"executed_lines": [1, 2], "missing_lines": [5, 6, 7, 8]}}
     )
 
-    assert main([str(report_path), "--packages", "edu_quality_audit"]) == 1
+    assert main([str(report_path), "--packages", "translation_quality_audit"]) == 1
 
 
 def test_main_scans_both_packages_by_default(package_file, tmp_path):
@@ -148,7 +148,7 @@ def test_main_lists_the_five_worst_functions_with_their_scores(tmp_path, capsys)
     executed = [line for index in range(6) for line in (4 * index + 1, 4 * index + 2)]
     report_path = write_report(tmp_path, {path: {"executed_lines": executed, "missing_lines": []}})
 
-    main([str(report_path), "--packages", "edu_quality_audit"])
+    main([str(report_path), "--packages", "translation_quality_audit"])
 
     output = capsys.readouterr().out.splitlines()
     assert sum(line.startswith("CRAP ") for line in output) == 5

@@ -1,4 +1,4 @@
-# finetranslations-edu-quality-audit
+# finetranslations-translation-quality-audit
 
 Auditing the translation quality of FineTranslations documents. The project is at an early stage;
 the scope is still being defined.
