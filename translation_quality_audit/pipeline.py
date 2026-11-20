@@ -1,71 +1,65 @@
-"""Audit one language: sample its documents by quality level, then score each pair."""
-
-from collections import defaultdict
+"""Audit one language: plan a sample from the index, then read and score only its groups."""
 
 import pyarrow as pa
 
-from translation_quality_audit.sampling import stratified_sample
+from translation_quality_audit.index import language_entries as entries_of
+from translation_quality_audit.plan import plan_stratified
 from translation_quality_audit.score import score_pair
-from translation_quality_audit.source import (
-    Opener,
-    language_row_groups,
-    read_row_groups,
-    select_language_rows,
-)
+from translation_quality_audit.source import Opener, read_row_groups, select_language_rows
 
 ID = "id"
 LEVEL = "edu_score"
 SOURCE = "og_full_text"
 TRANSLATION = "translated_text"
+COLUMNS = [ID, "og_language", LEVEL, SOURCE, TRANSLATION]
+STALE_INDEX = "the index is out of date for this row group"
 
 
 def audit_language(
-    opener: Opener, paths: list[str], language: str, total: int, seed: int, identifier
+    opener: Opener, language: str, total: int, seed: int, identifier, index: pa.Table
 ) -> list[dict]:
-    """Score a stratified sample of the language's documents, reading only the bytes it needs."""
-    refs = language_row_groups(opener, paths, language)
-    levels_by_id, ref_by_id = _index_language(opener, refs, language)
-    chosen = stratified_sample(_ids_by_level(levels_by_id), total, seed)
-    return [
-        _scored_row(row, language, levels_by_id, identifier)
-        for row in _texts_of(opener, chosen, ref_by_id)
-    ]
+    """Score a stratified sample of the language's documents, reading only the groups it needs."""
+    plan = plan_stratified(entries_of(index, language), total, seed)
+    groups = list(plan)
+    tables = read_row_groups(opener, groups, COLUMNS)
+    rows: list[dict] = []
+    for group, table in zip(groups, tables, strict=True):
+        rows.extend(_scored_picks(table, language, plan[group], identifier))
+    return rows
 
 
-def _texts_of(opener, chosen: list[str], ref_by_id: dict) -> list[dict]:
-    """The source and translation of the chosen documents, from only the row groups holding them."""
-    if not chosen:
-        return []
-    needed = list(dict.fromkeys(ref_by_id[doc_id] for doc_id in chosen))
-    texts = pa.concat_tables(read_row_groups(opener, needed, [ID, SOURCE, TRANSLATION]))
-    wanted = set(chosen)
-    picked = texts.take([i for i, doc_id in enumerate(texts[ID].to_pylist()) if doc_id in wanted])
-    return picked.to_pylist()
+def _scored_picks(
+    table: pa.Table, language: str, picks: dict[int, list[int]], identifier
+) -> list[dict]:
+    """The planned documents of one row group, scored."""
+    rows = select_language_rows(table, language)
+    positions = _planned_positions(rows[LEVEL].to_pylist(), picks)
+    return [_scored_row(row, language, identifier) for row in rows.take(positions).to_pylist()]
 
 
-def _scored_row(row: dict, language: str, levels_by_id: dict, identifier) -> dict:
+def _planned_positions(levels: list[int], picks: dict[int, list[int]]) -> list[int]:
+    """The row positions of the planned ranks, checked against the rows that exist."""
+    positions = []
+    for level, ranks in picks.items():
+        at_level = _positions_at(levels, level)
+        _check_available(ranks, at_level)
+        positions.extend(at_level[rank] for rank in ranks)
+    return positions
+
+
+def _positions_at(levels: list[int], level: int) -> list[int]:
+    return [position for position, value in enumerate(levels) if value == level]
+
+
+def _check_available(ranks: list[int], at_level: list[int]) -> None:
+    if ranks and ranks[-1] >= len(at_level):
+        raise ValueError(STALE_INDEX)
+
+
+def _scored_row(row: dict, language: str, identifier) -> dict:
     return {
         ID: row[ID],
         "language": language,
-        LEVEL: levels_by_id[row[ID]],
+        LEVEL: row[LEVEL],
         **score_pair(row[SOURCE], row[TRANSLATION], identifier),
     }
-
-
-def _index_language(opener, refs, language):
-    levels_by_id: dict[str, int] = {}
-    ref_by_id: dict[str, tuple[str, int]] = {}
-    tables = read_row_groups(opener, refs, [ID, "og_language", LEVEL])
-    for ref, table in zip(refs, tables, strict=True):
-        rows = select_language_rows(table, language)
-        for doc_id, level in zip(rows[ID].to_pylist(), rows[LEVEL].to_pylist(), strict=True):
-            levels_by_id[doc_id] = level
-            ref_by_id[doc_id] = ref
-    return levels_by_id, ref_by_id
-
-
-def _ids_by_level(levels_by_id: dict[str, int]) -> dict[int, list[str]]:
-    grouped: dict[int, list[str]] = defaultdict(list)
-    for doc_id, level in levels_by_id.items():
-        grouped[level].append(doc_id)
-    return dict(grouped)

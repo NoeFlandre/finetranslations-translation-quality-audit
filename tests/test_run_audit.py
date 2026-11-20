@@ -4,23 +4,22 @@ from pathlib import Path
 import pyarrow.parquet as pq
 import pytest
 import scripts.run_audit as run_audit
+from translation_quality_audit.hub import DEFAULT_REPO, INDEX_PATH, INDEXED_LANGUAGES
+from translation_quality_audit.index import build_index, index_to_parquet
 
 from tests.helpers import FixedModel, open_local
 
 
-class FakeFileSystem:
-    def __init__(self, paths):
-        self.paths = paths
-        self.patterns = []
-        self.block_sizes = []
+class RemoteFiles:
+    """Opens the index from a local copy, and every other path from its own location."""
 
-    def glob(self, pattern):
-        self.patterns.append(pattern)
-        return list(self.paths)
+    def __init__(self, remote_files):
+        self.remote_files = remote_files
+        self.opened = []
 
-    def open(self, path, block_size=None, **_kwargs):
-        self.block_sizes.append(block_size)
-        return open_local(path)
+    def __call__(self, path):
+        self.opened.append(path)
+        return open_local(self.remote_files.get(path, path))
 
 
 class RecordingApi:
@@ -31,15 +30,34 @@ class RecordingApi:
         self.uploads.append((path_or_fileobj, path_in_repo, repo_id, repo_type))
 
 
-def test_the_defaults_audit_the_four_high_resource_languages_with_100_documents_each():
+@pytest.fixture
+def remote(tmp_path, parquet_files):
+    index_file = tmp_path / "groups.parquet"
+    index_file.write_bytes(index_to_parquet(build_index(open_local, parquet_files)))
+    index_path = f"datasets/{DEFAULT_REPO}/{INDEX_PATH}"
+    return {index_path: str(index_file)}
+
+
+def install(monkeypatch, remote_files, api=None):
+    monkeypatch.setattr(run_audit, "open_remote", remote_files)
+    monkeypatch.setattr(run_audit, "HfApi", lambda: api or RecordingApi())
+    monkeypatch.setattr(run_audit, "ensure_model", lambda path: path)
+    monkeypatch.setattr(run_audit, "load_identifier", lambda _path: FixedModel())
+
+
+def test_the_defaults_audit_the_four_indexed_languages_with_100_documents_each():
     args = run_audit.parse_args([])
 
-    assert args.languages == list(run_audit.HIGH_RESOURCE)
-    assert args.total == 100
-    assert args.seed == 0
-    assert args.repo == "NoeFlandre/finetranslations-translation-quality-audit"
+    assert args.languages == list(INDEXED_LANGUAGES)
+    assert (args.total, args.seed) == (100, 0)
+    assert args.repo == DEFAULT_REPO
     assert args.path == "v1/audit.parquet"
     assert args.model == run_audit.DEFAULT_MODEL
+
+
+def test_only_indexed_languages_can_be_audited():
+    with pytest.raises(SystemExit):
+        run_audit.parse_args(["--languages", "zho_Hans"])
 
 
 def test_numeric_and_path_options_are_parsed_to_their_types():
@@ -64,43 +82,19 @@ def test_the_help_describes_the_tool_and_every_option(capsys):
         assert text in output
 
 
-def test_main_audits_each_language_and_uploads_one_parquet_file(monkeypatch, capsys, parquet_files):
-    fs = FakeFileSystem(parquet_files)
+def test_main_reads_the_index_audits_each_language_and_uploads_one_parquet_file(
+    monkeypatch, capsys, remote
+):
+    remote_files = RemoteFiles(remote)
     api = RecordingApi()
-    ensured, loaded = [], []
-
-    def ensure(path):
-        ensured.append(path)
-        return path
-
-    def load(path):
-        loaded.append(path)
-        return FixedModel()
-
-    monkeypatch.setattr(run_audit, "HfFileSystem", lambda: fs)
-    monkeypatch.setattr(run_audit, "HfApi", lambda: api)
-    monkeypatch.setattr(run_audit, "ensure_model", ensure)
-    monkeypatch.setattr(run_audit, "load_identifier", load)
+    install(monkeypatch, remote_files, api)
 
     status = run_audit.main(
-        [
-            "--languages",
-            "deu_Latn",
-            "--total",
-            "2",
-            "--model",
-            "lid.176.ftz",
-            "--path",
-            "v1/a.parquet",
-            "--repo",
-            "user/repo",
-        ]
+        ["--languages", "deu_Latn", "--total", "2", "--path", "v1/a.parquet", "--repo", "user/repo"]
     )
 
     assert status == 0
-    assert fs.patterns == [run_audit.DATA_GLOB]
-    assert ensured == [Path("lid.176.ftz")]
-    assert loaded == [Path("lid.176.ftz")]
+    assert f"datasets/{DEFAULT_REPO}/{INDEX_PATH}" in remote_files.opened
     [(data, path, repo, repo_type)] = api.uploads
     assert (path, repo, repo_type) == ("v1/a.parquet", "user/repo", "dataset")
     table = pq.read_table(io.BytesIO(data))
@@ -109,34 +103,17 @@ def test_main_audits_each_language_and_uploads_one_parquet_file(monkeypatch, cap
     assert capsys.readouterr().out.strip() == "uploaded 2 rows to user/repo/v1/a.parquet"
 
 
-def test_main_passes_the_seed_to_each_language_audit(monkeypatch, parquet_files):
+def test_main_passes_the_seed_to_each_language_audit(monkeypatch, remote):
     seen = []
     original = run_audit.audit_language
 
-    def recording(opener, paths, language, total, seed, identifier):
+    def recording(opener, language, total, seed, identifier, index):
         seen.append((language, seed))
-        return original(opener, paths, language, total, seed, identifier)
+        return original(opener, language, total, seed, identifier, index)
 
     monkeypatch.setattr(run_audit, "audit_language", recording)
-    monkeypatch.setattr(run_audit, "HfFileSystem", lambda: FakeFileSystem(parquet_files))
-    monkeypatch.setattr(run_audit, "HfApi", RecordingApi)
-    monkeypatch.setattr(run_audit, "ensure_model", lambda path: path)
-    monkeypatch.setattr(run_audit, "load_identifier", lambda _path: FixedModel())
+    install(monkeypatch, RemoteFiles(remote))
 
     run_audit.main(["--languages", "deu_Latn", "fra_Latn", "--total", "1", "--seed", "9"])
 
     assert seen == [("deu_Latn", 9), ("fra_Latn", 9)]
-
-
-def test_remote_reads_use_small_blocks_so_each_column_read_stays_small(monkeypatch, parquet_files):
-    fs = FakeFileSystem(parquet_files)
-    monkeypatch.setattr(run_audit, "HfFileSystem", lambda: fs)
-    monkeypatch.setattr(run_audit, "HfApi", RecordingApi)
-    monkeypatch.setattr(run_audit, "ensure_model", lambda path: path)
-    monkeypatch.setattr(run_audit, "load_identifier", lambda _path: FixedModel())
-
-    run_audit.main(["--languages", "deu_Latn", "--total", "1"])
-
-    assert fs.block_sizes
-    assert set(fs.block_sizes) == {run_audit.READ_BLOCK_SIZE}
-    assert run_audit.READ_BLOCK_SIZE <= 1 << 20

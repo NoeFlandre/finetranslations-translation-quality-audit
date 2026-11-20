@@ -1,35 +1,9 @@
 import pyarrow as pa
-from translation_quality_audit.source import (
-    language_row_groups,
-    read_row_groups,
-    select_language_rows,
-)
+from translation_quality_audit.source import read_row_groups, select_language_rows
 
 from tests.helpers import make_rows, open_local, write_parquet
 
 COLUMNS = ["id", "og_language", "edu_score", "og_full_text", "translated_text"]
-
-
-def test_language_row_groups_are_found_from_the_footer_statistics(parquet_files):
-    refs = language_row_groups(open_local, parquet_files, "deu_Latn")
-
-    assert sorted(refs) == [(parquet_files[0], 1), (parquet_files[0], 2)]
-
-
-def test_a_language_contained_in_one_row_group_is_found_in_that_group_only(parquet_files):
-    refs = language_row_groups(open_local, parquet_files, "rus_Cyrl")
-
-    assert refs == [(parquet_files[1], 2)]
-
-
-def test_a_language_absent_from_every_file_has_no_row_groups(parquet_files):
-    assert language_row_groups(open_local, parquet_files, "zho_Hans") == []
-
-
-def test_a_row_group_without_statistics_is_kept_because_it_cannot_be_ruled_out(tmp_path):
-    path = write_parquet(tmp_path / "bare.parquet", make_rows("fra_Latn", 3, 0), statistics=False)
-
-    assert language_row_groups(open_local, [path], "fra_Latn") == [(path, 0)]
 
 
 def test_read_row_groups_returns_one_table_per_group_with_only_the_requested_columns(

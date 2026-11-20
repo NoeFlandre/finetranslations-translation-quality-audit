@@ -28,12 +28,14 @@ def results_to_parquet(rows: list[dict]) -> bytes:
     return buffer.getvalue()
 
 
-def upload_results(api, repo_id: str, path_in_repo: str, data: bytes) -> None:
+def upload_results(
+    api, repo_id: str, path_in_repo: str, data: bytes, message: str = "Add audit results"
+) -> None:
     """Upload a Parquet file to a dataset repo, without writing it to local disk."""
     api.upload_file(
         path_or_fileobj=data,
         path_in_repo=path_in_repo,
         repo_id=repo_id,
         repo_type="dataset",
-        commit_message="Add audit results",
+        commit_message=message,
     )

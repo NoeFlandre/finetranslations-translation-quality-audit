@@ -23,10 +23,19 @@ Each feature is raw and undefined (NaN) when its denominator is empty. v1 publis
 The sample per language is 100 documents, split equally across the integer `edu_score` levels,
 drawn with a fixed seed.
 
+## The language index
+
+Reading a sample by scanning every file would take too many requests, because the Hub rate-limits
+them. A small index says how many documents of each audited language and level sit in each row
+group. It covers the four audited languages only (`fra_Latn`, `deu_Latn`, `rus_Cyrl`, `cmn_Hani`),
+and it reads only the row groups whose footer language range can hold one of them. For those
+languages it is complete; for other languages it has no entries, so the audit refuses them.
+
 ## Running it
 
 ```bash
 uv sync
+uv run python -m scripts.build_index   # once: uploads the language index
 uv run python -m scripts.run_audit --languages fra_Latn deu_Latn --total 100
 ```
 
