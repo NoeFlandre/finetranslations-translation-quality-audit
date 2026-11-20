@@ -1,6 +1,6 @@
 # finetranslations-edu-quality-audit
 
-Auditing the educational quality of FineTranslations documents. The project is at an early stage;
+Auditing the translation quality of FineTranslations documents. The project is at an early stage;
 the scope is still being defined.
 
 ## Development

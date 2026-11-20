@@ -1,7 +1,7 @@
 [project]
 name = "finetranslations-edu-quality-audit"
 version = "0.1.0"
-description = "Auditing the educational quality of FineTranslations documents."
+description = "Auditing the translation quality of FineTranslations documents."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []

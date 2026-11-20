@@ -1,6 +1,6 @@
 # finetranslations-edu-quality-audit
 
-Auditing the educational quality of FineTranslations documents. The scope is still being defined.
+Auditing the translation quality of FineTranslations documents. The scope is still being defined.
 
 ## Development
 
