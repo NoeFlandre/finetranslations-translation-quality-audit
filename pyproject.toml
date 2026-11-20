@@ -1,0 +1,58 @@
+[project]
+name = "finetranslations-edu-quality-audit"
+version = "0.1.0"
+description = "Auditing the educational quality of FineTranslations documents."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.8.2",
+    "mutmut>=3.8.1",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "radon>=6.0.1",
+    "ruff>=0.17.6",
+    "ty>=0.0.107",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["edu_quality_audit", "scripts"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = ["if __name__ == .__main__.:"]
+fail_under = 100
+
+[tool.ruff]
+line-length = 100
+src = ["edu_quality_audit", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "I", "B", "UP", "SIM", "N", "D",
+    "ARG", "RET", "C90", "PERF", "RUF", "PIE", "PT", "PTH", "C4", "ERA", "FURB", "TRY",
+]
+ignore = ["D100", "D104", "D107", "N812"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 5
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["D"]
+
+[tool.mutmut]
+source_paths = ["edu_quality_audit/", "scripts/"]
